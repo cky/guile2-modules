@@ -28,6 +28,7 @@
   #:use-module ((srfi srfi-45)
                 #:select (lazy eager delay force promise?)
                 #:renamer (symbol-prefix-proc 'stream-))
+  #:use-module (streams common)
   #:export (stream? stream-null stream-null?
             stream-pair? stream-car stream-cdr)
   #:export-syntax (stream-cons stream-lambda))
@@ -48,23 +49,20 @@
 (define (stream-pair? obj)
   (and (stream-promise? obj) (stream-pare? (stream-force obj))))
 
-(define (error func msg . args)
-  (scm-error 'wrong-type-arg func msg '() args))
-
 (define-syntax stream-cons
   (syntax-rules ()
     ((stream-cons obj strm)
      (stream-eager (make-stream-pare (stream-delay obj) (stream-lazy strm))))))
 
 (define (stream-car strm)
-  (cond ((not (stream? strm)) (error 'stream-car "non-stream" strm))
-        ((stream-null? strm) (error 'stream-car "null stream" strm))
-        (else (stream-force (stream-kar (stream-force strm))))))
+  (must stream? strm 'stream-car "non-stream")
+  (must-not stream-null? strm 'stream-car "null stream")
+  (stream-force (stream-kar (stream-force strm))))
 
 (define (stream-cdr strm)
-  (cond ((not (stream? strm)) (error 'stream-cdr "non-stream" strm))
-        ((stream-null? strm) (error 'stream-cdr "null stream" strm))
-        (else (stream-kdr (stream-force strm)))))
+  (must stream? strm 'stream-cdr "non-stream")
+  (must-not stream-null? strm 'stream-cdr "null stream")
+  (stream-kdr (stream-force strm)))
 
 (define-syntax stream-lambda
   (syntax-rules ()
