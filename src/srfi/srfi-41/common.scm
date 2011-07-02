@@ -22,7 +22,7 @@
 ;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ;; SOFTWARE.
 
-(define-module (streams common)
+(define-module (srfi srfi-41 common)
   #:export (must must-not must-every))
 
 (define (must-not pred obj func msg . args)

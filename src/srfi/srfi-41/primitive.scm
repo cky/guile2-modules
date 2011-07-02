@@ -23,12 +23,12 @@
 ;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ;; SOFTWARE.
 
-(define-module (streams primitive)
+(define-module (srfi srfi-41 primitive)
   #:use-module (srfi srfi-9)
   #:use-module ((srfi srfi-45)
                 #:select (lazy eager delay force promise?)
                 #:renamer (symbol-prefix-proc 'stream-))
-  #:use-module (streams common)
+  #:use-module (srfi srfi-41 common)
   #:export (stream? stream-null stream-null?
             stream-pair? stream-car stream-cdr)
   #:export-syntax (stream-cons stream-lambda))

@@ -23,10 +23,10 @@
 ;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ;; SOFTWARE.
 
-(define-module (streams derived)
+(define-module (srfi srfi-41 derived)
   #:use-module (srfi srfi-1)
-  #:use-module (streams primitive)
-  #:use-module (streams common)
+  #:use-module (srfi srfi-41 primitive)
+  #:use-module (srfi srfi-41 common)
   #:export-syntax (define-stream stream stream-do stream-let)
   #:export (list->stream port->stream stream->list stream-append
             stream-concat stream-constant stream-drop stream-drop-while
