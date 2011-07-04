@@ -52,15 +52,12 @@
     (if (null? objs) stream-null
         (stream-cons (car objs) (recur (cdr objs))))))
 
-(define port->stream
-  (case-lambda
-   (() (port->stream (current-input-port)))
-   ((port)
-    (must input-port? port 'port->stream "non-input-port argument")
-    (stream-let recur ()
-      (let ((c (read-char port)))
-        (if (eof-object? c) stream-null
-            (stream-cons c (recur))))))))
+(define* (port->stream #:optional (port (current-input-port)))
+  (must input-port? port 'port->stream "non-input-port argument")
+  (stream-let recur ()
+    (let ((c (read-char port)))
+      (if (eof-object? c) stream-null
+          (stream-cons c (recur))))))
 
 (define-syntax stream
   (syntax-rules ()
@@ -100,10 +97,11 @@
                            (recur (stream-cons (stream-cdr strm)
                                                (stream-cdr strms)))))))))
 
-(define (stream-constant . objs)
-  (if (null? objs) stream-null
-      (stream-let recur ((objs (apply circular-list objs)))
-        (stream-cons (car objs) (recur (cdr objs))))))
+(define stream-constant
+  (case-lambda
+   (() stream-null)
+   (objs (stream-let recur ((objs (apply circular-list objs)))
+           (stream-cons (car objs) (recur (cdr objs)))))))
 
 (define-syntax stream-do
   (syntax-rules ()
@@ -162,14 +160,11 @@
         ((any stream-null? strms))
       (apply proc (map stream-car strms)))))
 
-(define stream-from
-  (case-lambda
-   ((first) (stream-from first 1))
-   ((first step)
-    (must number? first 'stream-from "non-numeric starting number")
-    (must number? step 'stream-from "non-numeric step size")
-    (stream-let recur ((first first))
-      (stream-cons first (recur (+ first step)))))))
+(define* (stream-from first #:optional (step 1))
+  (must number? first 'stream-from "non-numeric starting number")
+  (must number? step 'stream-from "non-numeric step size")
+  (stream-let recur ((first first))
+    (stream-cons first (recur (+ first step)))))
 
 (define (stream-iterate proc base)
   (must procedure? proc 'stream-iterate "non-procedural argument")
@@ -193,19 +188,15 @@
 
 ;; stream-match, stream-of not implemented yet
 
-(define stream-range
-  (case-lambda
-   ((first past)
-    (stream-range first past (if (< first past) 1 -1)))
-   ((first past step)
-    (must number? first 'stream-range "non-numeric starting number")
-    (must number? past 'stream-range "non-numeric ending number")
-    (must number? step 'stream-range "non-numeric step size")
-    (let ((lt? (if (< 0 step) < >)))
-      (stream-let recur ((first first))
-        (if (lt? first past)
-            (stream-cons first (recur (+ first step)))
-            stream-null))))))
+(define* (stream-range first past #:optional (step (if (< first past) 1 -1)))
+  (must number? first 'stream-range "non-numeric starting number")
+  (must number? past 'stream-range "non-numeric ending number")
+  (must number? step 'stream-range "non-numeric step size")
+  (let ((lt? (if (< 0 step) < >)))
+    (stream-let recur ((first first))
+      (if (lt? first past)
+          (stream-cons first (recur (+ first step)))
+          stream-null))))
 
 (define (stream-ref strm n)
   (must stream? strm 'stream-ref "non-stream argument")
