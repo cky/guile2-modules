@@ -24,6 +24,7 @@
 ;; SOFTWARE.
 
 (define-module (srfi srfi-41 primitive)
+  #:use-module (guile compat)
   #:use-module (srfi srfi-9)
   #:use-module ((srfi srfi-45)
                 #:select (lazy eager delay force promise?)
@@ -49,10 +50,8 @@
 (define (stream-pair? obj)
   (and (stream-promise? obj) (stream-pare? (stream-force obj))))
 
-(define-syntax stream-cons
-  (syntax-rules ()
-    ((stream-cons obj strm)
-     (stream-eager (make-stream-pare (stream-delay obj) (stream-lazy strm))))))
+(define-syntax-rule (stream-cons obj strm)
+  (stream-eager (make-stream-pare (stream-delay obj) (stream-lazy strm))))
 
 (define (stream-car strm)
   (must stream? strm 'stream-car "non-stream")
@@ -64,7 +63,5 @@
   (must-not stream-null? strm 'stream-cdr "null stream")
   (stream-kdr (stream-force strm)))
 
-(define-syntax stream-lambda
-  (syntax-rules ()
-    ((stream-lambda formals body0 body1 ...)
-     (lambda formals (stream-lazy (begin body0 body1 ...))))))
+(define-syntax-rule (stream-lambda formals body0 body1 ...)
+  (lambda formals (stream-lazy (begin body0 body1 ...))))

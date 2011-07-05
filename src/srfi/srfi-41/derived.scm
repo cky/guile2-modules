@@ -24,6 +24,7 @@
 ;; SOFTWARE.
 
 (define-module (srfi srfi-41 derived)
+  #:use-module (guile compat)
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-41 primitive)
   #:use-module (srfi srfi-41 common)
@@ -36,15 +37,11 @@
             stream-take stream-take-while stream-unfold stream-unfolds
             stream-zip))
 
-(define-syntax define-stream
-  (syntax-rules ()
-    ((define-stream (name . formal) body0 body1 ...)
-     (define name (stream-lambda formal body0 body1 ...)))))
+(define-syntax-rule (define-stream (name . formal) body0 body1 ...)
+  (define name (stream-lambda formal body0 body1 ...)))
 
-(define-syntax stream-let
-  (syntax-rules ()
-    ((stream-let tag ((name val) ...) body1 body2 ...)
-     ((letrec ((tag (stream-lambda (name ...) body1 body2 ...))) tag) val ...))))
+(define-syntax-rule (stream-let tag ((name val) ...) body1 body2 ...)
+  ((letrec ((tag (stream-lambda (name ...) body1 body2 ...))) tag) val ...))
 
 (define (list->stream objs)
   (must list? objs 'list->stream "non-list argument")
@@ -61,17 +58,17 @@
 
 (define-syntax stream
   (syntax-rules ()
-    ((stream) stream-null)
-    ((stream x y ...) (stream-cons x (stream y ...)))))
+    ((_) stream-null)
+    ((_ x y ...) (stream-cons x (stream y ...)))))
 
 (define stream->list
   (case-lambda
    ((strm) (stream->list #f strm))
    ((n strm)
     (must stream? strm 'stream->list "non-stream argument")
-    (if n (begin
-            (must integer? n 'stream->list "non-integer count")
-            (must-not negative? n 'stream->list "negative count")))
+    (when n
+      (must integer? n 'stream->list "non-integer count")
+      (must-not negative? n 'stream->list "negative count"))
     (do ((n (or n -1) (1- n))
          (res '() (cons (stream-car strm) res))
          (strm strm (stream-cdr strm)))
@@ -103,24 +100,25 @@
    (objs (stream-let recur ((objs (apply circular-list objs)))
            (stream-cons (car objs) (recur (cdr objs)))))))
 
-(define-syntax stream-do
+(define-syntax-rule (stream-do ((var init . step) ...)
+                               (test expr ...)
+                               command ...)
+  (stream-let loop ((var init) ...)
+    (if test
+        (stream-do-end expr ...)
+        (begin
+          command ...
+          (loop (stream-do-step var . step) ...)))))
+
+(define-syntax stream-do-end
   (syntax-rules ()
-    ((stream-do ((var init step ...) ...)
-                (test expr ...)
-                command ...)
-     (stream-let loop ((var init) ...)
-       (if test
-           (begin
-             *unspecified*
-             expr ...)
-           (begin
-             command ...
-             (loop (stream-do-step var step ...) ...)))))))
+    ((_) (if #f #f))
+    ((_ expr ...) (begin expr ...))))
 
 (define-syntax stream-do-step
   (syntax-rules ()
-    ((stream-do-step var) var)
-    ((stream-do-step var step) step)))
+    ((_ var) var)
+    ((_ var step) step)))
 
 (define (stream-drop n strm)
   (must integer? n 'stream-drop "non-integer argument")
