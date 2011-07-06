@@ -1,4 +1,4 @@
-;;; common.scm -- Guile compatibility functionality
+;;; compat.scm -- Guile compatibility functionality
 
 ;; Copyright (c) 2011 Chris K. Jester-Young.
 ;;
