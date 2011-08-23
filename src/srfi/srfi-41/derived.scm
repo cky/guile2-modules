@@ -28,14 +28,13 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-41 primitive)
   #:use-module (srfi srfi-41 common)
-  #:export-syntax (define-stream stream stream-do stream-let)
-  #:export (list->stream port->stream stream->list stream-append
-            stream-concat stream-constant stream-drop stream-drop-while
-            stream-filter stream-fold stream-for-each stream-from
-            stream-iterate stream-length stream-map stream-match
-            stream-of stream-range stream-ref stream-reverse stream-scan
-            stream-take stream-take-while stream-unfold stream-unfolds
-            stream-zip))
+  #:export (define-stream list->stream port->stream stream stream->list
+            stream-append stream-concat stream-constant stream-do
+            stream-drop stream-drop-while stream-filter stream-fold
+            stream-for-each stream-from stream-iterate stream-length
+            stream-let stream-map stream-match stream-of stream-range
+            stream-ref stream-reverse stream-scan stream-take
+            stream-take-while stream-unfold stream-unfolds stream-zip))
 
 (define-syntax-rule (define-stream (name . formal) body0 body1 ...)
   (define name (stream-lambda formal body0 body1 ...)))
@@ -44,6 +43,8 @@
   ((letrec ((tag (stream-lambda (name ...) body1 body2 ...))) tag) val ...))
 
 (define (list->stream objs)
+  (define (list? x)
+    (or (proper-list? x) (circular-list? x)))
   (must list? objs 'list->stream "non-list argument")
   (stream-let recur ((objs objs))
     (if (null? objs) stream-null
@@ -97,28 +98,31 @@
 (define stream-constant
   (case-lambda
    (() stream-null)
-   (objs (stream-let recur ((objs (apply circular-list objs)))
-           (stream-cons (car objs) (recur (cdr objs)))))))
+   (objs (list->stream (apply circular-list objs)))))
 
-(define-syntax-rule (stream-do ((var init . step) ...)
-                               (test expr ...)
-                               command ...)
-  (stream-let loop ((var init) ...)
-    (if test
-        (stream-do-end expr ...)
-        (begin
-          command ...
-          (loop (stream-do-step var . step) ...)))))
+(define-syntax (stream-do x)
+  (define (end x)
+    (syntax-case x ()
+      (() #'(if #f #f))
+      ((result) #'result)
+      ((result ...) #'(begin result ...))))
+  (define (next x)
+    (syntax-case x ()
+      ((var init) #'(var init var))
+      ((var init step) #'(var init step))))
 
-(define-syntax stream-do-end
-  (syntax-rules ()
-    ((_) (if #f #f))
-    ((_ expr ...) (begin expr ...))))
-
-(define-syntax stream-do-step
-  (syntax-rules ()
-    ((_ var) var)
-    ((_ var step) step)))
+  (syntax-case x ()
+    ((_ (binding ...)
+        (test result ...)
+        expr ...)
+     (with-syntax ((result (end #'(result ...)))
+                   (((var init step) ...)
+                    (map next #'(binding ...))))
+       #'(stream-let loop ((var init) ...)
+           (if test result
+               (begin
+                 expr ...
+                 (loop step ...))))))))
 
 (define (stream-drop n strm)
   (must integer? n 'stream-drop "non-integer argument")
@@ -150,13 +154,21 @@
        (strm strm (stream-cdr strm)))
       ((stream-null? strm) base)))
 
-(define (stream-for-each proc strm . rest)
-  (let ((strms (cons strm rest)))
+(define stream-for-each
+  (case-lambda
+   ((proc strm)
     (must procedure? proc 'stream-for-each "non-procedural argument")
-    (must-every stream? strms 'stream-for-each "non-stream argument")
-    (do ((strms strms (map stream-cdr strms)))
-        ((any stream-null? strms))
-      (apply proc (map stream-car strms)))))
+    (must stream? strm 'stream-for-each "non-stream argument")
+    (do ((strm strm (stream-cdr strm)))
+        ((stream-null? strm))
+      (proc (stream-car strm))))
+   ((proc strm . rest)
+    (let ((strms (cons strm rest)))
+      (must procedure? proc 'stream-for-each "non-procedural argument")
+      (must-every stream? strms 'stream-for-each "non-stream argument")
+      (do ((strms strms (map stream-cdr strms)))
+          ((any stream-null? strms))
+        (apply proc (map stream-car strms)))))))
 
 (define* (stream-from first #:optional (step 1))
   (must number? first 'stream-from "non-numeric starting number")
@@ -175,14 +187,23 @@
        (strm strm (stream-cdr strm)))
       ((stream-null? strm) len)))
 
-(define (stream-map proc strm . rest)
-  (let ((strms (cons strm rest)))
+(define stream-map
+  (case-lambda
+   ((proc strm)
     (must procedure? proc 'stream-map "non-procedural argument")
-    (must-every stream? strms 'stream-map "non-stream argument")
-    (stream-let recur ((strms strms))
-      (if (any stream-null? strms) stream-null
-          (stream-cons (apply proc (map stream-car strms))
-                       (recur (map stream-cdr strms)))))))
+    (must stream? strm 'stream-map "non-stream argument")
+    (stream-let recur ((strm strm))
+      (if (stream-null? strm) stream-null
+          (stream-cons (proc (stream-car strm))
+                       (recur (stream-cdr strm))))))
+   ((proc strm . rest)
+    (let ((strms (cons strm rest)))
+      (must procedure? proc 'stream-map "non-procedural argument")
+      (must-every stream? strms 'stream-map "non-stream argument")
+      (stream-let recur ((strms strms))
+        (if (any stream-null? strms) stream-null
+            (stream-cons (apply proc (map stream-car strms))
+                         (recur (map stream-cdr strms)))))))))
 
 ;; stream-match, stream-of not implemented yet
 

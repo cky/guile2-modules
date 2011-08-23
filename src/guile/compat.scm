@@ -23,8 +23,8 @@
   #:use-module ((guile)
                 #:select (define-syntax)
                 #:renamer (symbol-prefix-proc 'guile-))
-  #:replace-syntax (define-syntax)
-  #:export-syntax (define-syntax-rule when unless))
+  #:replace (define-syntax)
+  #:export (define-syntax-rule when unless))
 
 ;; http://lists.gnu.org/archive/html/guile-devel/2011-07/msg00021.html
 (guile-define-syntax define-syntax

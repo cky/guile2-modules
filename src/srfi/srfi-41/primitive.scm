@@ -30,9 +30,8 @@
                 #:select (lazy eager delay force promise?)
                 #:renamer (symbol-prefix-proc 'stream-))
   #:use-module (srfi srfi-41 common)
-  #:export (stream? stream-null stream-null?
-            stream-pair? stream-car stream-cdr)
-  #:export-syntax (stream-cons stream-lambda))
+  #:export (stream? stream-cons stream-lambda stream-null stream-null?
+            stream-pair? stream-car stream-cdr))
 
 (define (stream? obj)
   (or (stream-pair? obj) (stream-null? obj)))
