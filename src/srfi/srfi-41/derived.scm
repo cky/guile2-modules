@@ -26,8 +26,11 @@
 (define-module (srfi srfi-41 derived)
   #:use-module (guile compat)
   #:use-module (srfi srfi-1)
-  #:use-module (srfi srfi-41 primitive)
+  #:use-module (srfi srfi-8)
+  #:use-module (srfi srfi-26)
   #:use-module (srfi srfi-41 common)
+  #:use-module (srfi srfi-41 primitive)
+  #:use-module (srfi srfi-41 queue)
   #:export (define-stream list->stream port->stream stream stream->list
             stream-append stream-concat stream-constant stream-do
             stream-drop stream-drop-while stream-filter stream-fold
@@ -266,7 +269,65 @@
         (stream-cons (mapper base) (recur (generator base)))
         stream-null)))
 
-;; stream-unfolds not implemented yet
+;; This implementation of stream-unfolds was not based on the reference
+;; implementation at all. It has several special features:
+;;
+;; + The reference implementation calls the generator once more than
+;;   required, to get the number of streams to return. This version
+;;   does not do that; "every call is sacred". :-P
+;;
+;; + Results for other streams are stashed away in per-stream queues,
+;;   rather than one global result stream. This allows the generator to
+;;   return a list with more than one item, and have all those items be
+;;   stashed in the queue.
+;;
+;; + To be consistent with multiple-item list returns, really, an empty
+;;   list return should mean "no items", and a false return should mean
+;;   "end of stream", and that's how this function internally interprets
+;;   the return values.
+;;
+;;   For compatibility with the SRFI 41 spec, if the #:normal key is not
+;;   given a true value, a wrapper is applied to the generator function
+;;   to translate () to #f and vice versa.
+(define* (stream-unfolds gen seed #:key normal)
+  (define (feed-queue queue val)
+    (cond ((not (queue? queue)) queue)
+          ((not val) (queue->list queue))
+          (else
+           (must list? val 'stream-unfolds "generator returned invalid value")
+           (for-each (cut enqueue! queue <>) val)
+           queue)))
+  (define (update-queue queue-cons val-cons)
+    (set-car! queue-cons (feed-queue (car queue-cons) (car val-cons))))
+
+  (define (normalise val)
+    (case val
+      ((()) #f)
+      ((#f) '())
+      (else val)))
+  (define (wrap-normalise func)
+    (lambda (cur)
+      (receive (next . vals) (func cur)
+        (apply values next (map normalise vals)))))
+
+  (must procedure? gen 'stream-unfolds "non-procedural argument")
+  (let ((gen (if normal gen (wrap-normalise gen))))
+    (receive (cur . vals) (gen seed)
+      ; Each cons in queues is effectively used as a box
+      (define queues (map (cut feed-queue (make-queue) <>) vals))
+      (define (feed-queues)
+        (receive (next . vals) (gen cur)
+          (set! cur next)
+          (pair-for-each update-queue queues vals)))
+      (define (make-stream queue-cons)
+        (stream-let recur ()
+          (define queue (car queue-cons))
+          (cond ((not (queue? queue)) (set-car! queue-cons #f)
+                                      (list->stream queue))
+                ((queue-empty? queue) (feed-queues)
+                                      (recur))
+                (else (stream-cons (dequeue! queue) (recur))))))
+      (apply values (pair-map make-stream queues)))))
 
 (define (stream-zip strm . rest)
   (let ((strms (cons strm rest)))

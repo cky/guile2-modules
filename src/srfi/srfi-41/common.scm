@@ -23,7 +23,8 @@
 ;; SOFTWARE.
 
 (define-module (srfi srfi-41 common)
-  #:export (must must-not must-every))
+  #:use-module (srfi srfi-1)
+  #:export (must must-not must-every pair-map))
 
 (define (must-not pred obj func msg . args)
   (if (pred obj)
@@ -38,3 +39,9 @@
         (begin
           (apply must pred (car objs) func msg args)
           (loop (cdr objs))))))
+
+; Only the one-list version is supported since that's what we use.
+(define (pair-map proc clist)
+  (define (kons pair result)
+    (cons (proc pair) result))
+  (pair-fold-right kons '() clist))
