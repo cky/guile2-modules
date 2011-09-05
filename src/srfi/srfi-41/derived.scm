@@ -109,18 +109,18 @@
       (() #'(if #f #f))
       ((result) #'result)
       ((result ...) #'(begin result ...))))
-  (define (next x)
-    (syntax-case x ()
-      ((var init) #'(var init var))
-      ((var init step) #'(var init step))))
+  (define (var-step v s)
+    (syntax-case s ()
+      (() v)
+      ((e) #'e)
+      (_ (syntax-violation 'stream-do "bad step expression" x s))))
 
   (syntax-case x ()
-    ((_ (binding ...)
+    ((_ ((var init . step) ...)
         (test result ...)
         expr ...)
      (with-syntax ((result (end #'(result ...)))
-                   (((var init step) ...)
-                    (map next #'(binding ...))))
+                   ((step ...) (map var-step #'(var ...) #'(step ...))))
        #'(stream-let loop ((var init) ...)
            (if test result
                (begin
@@ -290,15 +290,15 @@
 ;;   given a true value, a wrapper is applied to the generator function
 ;;   to translate () to #f and vice versa.
 (define* (stream-unfolds gen seed #:key normal)
-  (define (feed-queue queue val)
+  (define (update-queue queue val)
     (cond ((not (queue? queue)) queue)
           ((not val) (queue->list queue))
           (else
            (must list? val 'stream-unfolds "generator returned invalid value")
            (for-each (cut enqueue! queue <>) val)
            queue)))
-  (define (update-queue queue-cons val-cons)
-    (set-car! queue-cons (feed-queue (car queue-cons) (car val-cons))))
+  (define (update-queue-cons! queue-cons val-cons)
+    (set-car! queue-cons (update-queue (car queue-cons) (car val-cons))))
 
   (define (normalise val)
     (case val
@@ -314,11 +314,11 @@
   (let ((gen (if normal gen (wrap-normalise gen))))
     (receive (cur . vals) (gen seed)
       ; Each cons in queues is effectively used as a box
-      (define queues (map (cut feed-queue (make-queue) <>) vals))
+      (define queues (map (cut update-queue (make-queue) <>) vals))
       (define (feed-queues)
         (receive (next . vals) (gen cur)
           (set! cur next)
-          (pair-for-each update-queue queues vals)))
+          (pair-for-each update-queue-cons! queues vals)))
       (define (make-stream queue-cons)
         (stream-let recur ()
           (define queue (car queue-cons))
