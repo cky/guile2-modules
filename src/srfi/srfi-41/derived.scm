@@ -30,7 +30,7 @@
   #:use-module (srfi srfi-26)
   #:use-module (srfi srfi-41 common)
   #:use-module (srfi srfi-41 primitive)
-  #:use-module (srfi srfi-41 queue)
+  #:use-module (ice-9 q)
   #:export (define-stream list->stream port->stream stream stream->list
             stream-append stream-concat stream-constant stream-do
             stream-drop stream-drop-while stream-filter stream-fold
@@ -291,11 +291,11 @@
 ;;   to translate () to #f and vice versa.
 (define* (stream-unfolds gen seed #:key normal)
   (define (update-queue queue val)
-    (cond ((not (queue? queue)) queue)
-          ((not val) (queue->list queue))
+    (cond ((or (not queue) (stream? queue)) queue)
+          ((not val) (list->stream (car queue)))
           (else
            (must list? val 'stream-unfolds "generator returned invalid value")
-           (for-each (cut enqueue! queue <>) val)
+           (for-each (cut enq! queue <>) val)
            queue)))
   (define (update-queue-cons! queue-cons val-cons)
     (set-car! queue-cons (update-queue (car queue-cons) (car val-cons))))
@@ -314,7 +314,7 @@
   (let ((gen (if normal gen (wrap-normalise gen))))
     (receive (cur . vals) (gen seed)
       ; Each cons in queues is effectively used as a box
-      (define queues (map (cut update-queue (make-queue) <>) vals))
+      (define queues (map (cut update-queue (make-q) <>) vals))
       (define (feed-queues)
         (receive (next . vals) (gen cur)
           (set! cur next)
@@ -322,11 +322,11 @@
       (define (make-stream queue-cons)
         (stream-let recur ()
           (define queue (car queue-cons))
-          (cond ((not (queue? queue)) (set-car! queue-cons #f)
-                                      (list->stream queue))
-                ((queue-empty? queue) (feed-queues)
-                                      (recur))
-                (else (stream-cons (dequeue! queue) (recur))))))
+          (cond ((stream? queue) (set-car! queue-cons #f)
+                                 queue)
+                ((q-empty? queue) (feed-queues)
+                                  (recur))
+                (else (stream-cons (deq! queue) (recur))))))
       (apply values (pair-map make-stream queues)))))
 
 (define (stream-zip strm . rest)
