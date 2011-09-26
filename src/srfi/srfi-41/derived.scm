@@ -224,10 +224,9 @@
   (must stream? strm 'stream-ref "non-stream argument")
   (must integer? n 'stream-ref "non-integer argument")
   (must-not negative? n 'stream-ref "negative argument")
-  (let loop ((strm strm) (n n))
-    (must-not stream-null? strm 'stream-ref "beyond end of stream")
-    (if (zero? n) (stream-car strm)
-        (loop (stream-cdr strm) (1- n)))))
+  (let ((res (stream-drop n strm)))
+    (must-not stream-null? res 'stream-ref "beyond end of stream")
+    (stream-car res)))
 
 (define (stream-reverse strm)
   (must stream? strm 'stream-reverse "non-stream argument")
