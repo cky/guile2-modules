@@ -23,8 +23,11 @@
 ;; SOFTWARE.
 
 (define-module (srfi srfi-41 common)
+  #:use-module (guile compat)
   #:use-module (srfi srfi-1)
-  #:export (must must-not must-every pair-map))
+  #:use-module (srfi srfi-8)
+  #:export (must must-not must-every pair-map first-value second-value
+            third-value))
 
 (define (must-not pred obj func msg . args)
   (if (pred obj)
@@ -45,3 +48,15 @@
   (define (kons pair result)
     (cons (proc pair) result))
   (pair-fold-right kons '() clist))
+
+(define-syntax-rule (first-value expr)
+  (receive (first . _) expr
+    first))
+
+(define-syntax-rule (second-value expr)
+  (receive (first second . _) expr
+    second))
+
+(define-syntax-rule (third-value expr)
+  (receive (first second third . _) expr
+    third))

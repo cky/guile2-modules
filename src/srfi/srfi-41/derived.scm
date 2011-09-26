@@ -36,7 +36,7 @@
             stream-drop stream-drop-while stream-filter stream-fold
             stream-for-each stream-from stream-iterate stream-length
             stream-let stream-map stream-match stream-of stream-range
-            stream-ref stream-reverse stream-scan stream-take
+            stream-ref stream-reverse stream-scan stream-split-at stream-take
             stream-take-while stream-unfold stream-unfolds stream-zip))
 
 (define-syntax-rule (define-stream (name . formal) body0 body1 ...)
@@ -73,10 +73,7 @@
     (when n
       (must integer? n 'stream->list "non-integer count")
       (must-not negative? n 'stream->list "negative count"))
-    (do ((n (or n -1) (1- n))
-         (res '() (cons (stream-car strm) res))
-         (strm strm (stream-cdr strm)))
-        ((or (zero? n) (stream-null? strm)) (reverse! res))))))
+    (reverse! (first-value (stream-fold-aux xcons '() strm n))))))
 
 (define (stream-append . strms)
   (must-every stream? strms 'stread-append "non-stream argument")
@@ -131,9 +128,7 @@
   (must integer? n 'stream-drop "non-integer argument")
   (must-not negative? n 'stream-drop "negative argument")
   (must stream? strm 'stream-drop "non-stream argument")
-  (stream-do ((n n (1- n))
-              (strm strm (stream-cdr strm)))
-             ((or (zero? n) (stream-null? strm)) strm)))
+  (second-value (stream-fold-aux #f #f strm n)))
 
 (define (stream-drop-while pred? strm)
   (must procedure? pred? 'stream-drop-while "non-procedural argument")
@@ -153,9 +148,16 @@
 (define (stream-fold proc base strm)
   (must procedure? proc 'stream-fold "non-procedural argument")
   (must stream? strm 'stream-fold "non-stream argument")
-  (do ((base base (proc base (stream-car strm)))
-       (strm strm (stream-cdr strm)))
-      ((stream-null? strm) base)))
+  (first-value (stream-fold-aux proc base strm)))
+
+;; Common helper for the various eager-folding functions, such as
+;; stream-fold, stream-drop, stream->list, stream-length, etc.
+(define* (stream-fold-aux proc base strm #:optional limit)
+  (do ((val base (and proc (proc val (stream-car strm))))
+       (strm strm (stream-cdr strm))
+       (limit limit (and limit (1- limit))))
+      ((or (and limit (zero? limit)) (stream-null? strm))
+       (values val strm limit))))
 
 (define stream-for-each
   (case-lambda
@@ -186,9 +188,7 @@
 
 (define (stream-length strm)
   (must stream? strm 'stream-length "non-stream argument")
-  (do ((len 0 (1+ len))
-       (strm strm (stream-cdr strm)))
-      ((stream-null? strm) len)))
+  (- -1 (third-value (stream-fold-aux #f #f strm -1))))
 
 (define stream-map
   (case-lambda
@@ -242,6 +242,15 @@
     (if (stream-null? strm) (stream base)
         (stream-cons base (recur (proc base (stream-car strm))
                                  (stream-cdr strm))))))
+
+;; Similar to (values (stream->list n strm) (stream-drop n strm)) but
+;; only iterates through the stream once.
+(define (stream-split-at n strm)
+  (must stream? strm 'stream-split-at "non-stream argument")
+  (must integer? n 'stream-split-at "non-integer argument")
+  (must-not negative? n 'stream-split-at "negative argument")
+  (receive (head tail _) (stream-fold-aux xcons '() strm n)
+    (values (reverse! head) tail)))
 
 (define (stream-take n strm)
   (must stream? strm 'stream-take "non-stream argument")

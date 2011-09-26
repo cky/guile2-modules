@@ -24,7 +24,7 @@
                 #:select (define-syntax)
                 #:renamer (symbol-prefix-proc 'guile-))
   #:replace (define-syntax)
-  #:export (define-syntax-rule when unless))
+  #:export (when unless))
 
 ;; http://lists.gnu.org/archive/html/guile-devel/2011-07/msg00021.html
 (guile-define-syntax define-syntax
@@ -47,3 +47,6 @@
 
 (define-syntax-rule (unless test body ...)
   (when (not test) body ...))
+
+(unless (defined? 'define-syntax-rule (resolve-module '(guile)))
+  (export define-syntax-rule))
