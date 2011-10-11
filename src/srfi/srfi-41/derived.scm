@@ -30,6 +30,7 @@
   #:use-module (srfi srfi-26)
   #:use-module (srfi srfi-41 common)
   #:use-module (srfi srfi-41 primitive)
+  #:use-module (ice-9 match)
   #:use-module (ice-9 q)
   #:export (define-stream list->stream port->stream stream stream->list
             stream-append stream-concat stream-constant stream-do
@@ -208,7 +209,45 @@
             (stream-cons (apply proc (map stream-car strms))
                          (recur (map stream-cdr strms)))))))))
 
-;; stream-match, stream-of not implemented yet
+(define-syntax (stream-match x)
+  (define (make-matcher x)
+    (syntax-case x ()
+      (() #'(? stream-null?))
+      (rest (identifier? #'rest) #'rest)
+      ((var next ... . rest) (identifier? #'var)
+       #`(? (negate stream-null?)
+            (= stream-car var)
+            (= stream-cdr #,(make-matcher #'(next ... . rest)))))))
+  (define (make-guarded x fail)
+    (syntax-case (list x fail) ()
+      (((expr) _) #'expr)
+      (((guard expr) fail) #'(if guard expr (fail)))))
+
+  (syntax-case x ()
+    ((_ strm-expr (pat . expr) ...)
+     (with-syntax (((fail ...) (generate-temporaries #'(pat ...))))
+       (with-syntax (((matcher ...) (map make-matcher #'(pat ...)))
+                     ((expr ...) (map make-guarded #'(expr ...) #'(fail ...))))
+         #'(let ((strm strm-expr))
+             (must stream? strm 'stream-match "non-stream argument")
+             (match strm (matcher (=> fail) expr) ...)))))))
+
+(define-syntax-rule (stream-of expr rest ...)
+  (stream-of-aux expr stream-null rest ...))
+
+(define-syntax stream-of-aux
+  (syntax-rules (in is)
+    ((_ expr base)
+     (stream-cons expr base))
+    ((_ expr base (var in stream) rest ...)
+     (stream-let recur ((strm stream))
+       (if (stream-null? strm) base
+           (let ((var (stream-car strm)))
+             (stream-of-aux expr (recur (stream-cdr strm)) rest ...)))))
+    ((_ expr base (var is exp) rest ...)
+     (let ((var exp)) (stream-of-aux expr base rest ...)))
+    ((_ expr base pred? rest ...)
+     (if pred? (stream-of-aux expr base rest ...) base))))
 
 (define* (stream-range first past #:optional (step (if (< first past) 1 -1)))
   (must number? first 'stream-range "non-numeric starting number")

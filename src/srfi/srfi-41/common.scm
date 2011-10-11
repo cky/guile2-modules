@@ -29,19 +29,23 @@
   #:export (must must-not must-every pair-map first-value second-value
             third-value))
 
-(define (must-not pred obj func msg . args)
-  (if (pred obj)
-      (scm-error 'wrong-type-arg func msg args (list obj))))
+(define (must-not1 pred obj func msg args)
+  (when (pred obj)
+    (throw 'wrong-type-arg func msg args (list obj))))
 
-(define (must pred obj func msg . args)
-  (apply must-not (negate pred) obj func msg args))
+(define (must-not* pred objs func msg args)
+  (define flunk (filter pred objs))
+  (unless (null? flunk)
+    (throw 'wrong-type-arg func msg args flunk)))
 
-(define (must-every pred objs func msg . args)
-  (let loop ((objs objs))
-    (if (not (null? objs))
-        (begin
-          (apply must pred (car objs) func msg args)
-          (loop (cdr objs))))))
+(define* (must-not pred obj func msg . args)
+  (must-not1 pred obj func msg args))
+
+(define* (must pred obj func msg . args)
+  (must-not1 (negate pred) obj func msg args))
+
+(define* (must-every pred objs func msg . args)
+  (must-not* (negate pred) objs func msg args))
 
 ; Only the one-list version is supported since that's what we use.
 (define (pair-map proc clist)
