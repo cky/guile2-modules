@@ -29,14 +29,14 @@
   #:export (must must-not must-every pair-map first-value second-value
             third-value))
 
-(define (must-not1 pred obj func msg args)
+(define-syntax-rule (must-not1 pred obj func msg args)
   (when (pred obj)
     (throw 'wrong-type-arg func msg args (list obj))))
 
-(define (must-not* pred objs func msg args)
-  (define flunk (filter pred objs))
-  (unless (null? flunk)
-    (throw 'wrong-type-arg func msg args flunk)))
+(define-syntax-rule (must-not* pred objs func msg args)
+  (let ((flunk (filter pred objs)))
+    (unless (null? flunk)
+      (throw 'wrong-type-arg func msg args flunk))))
 
 (define* (must-not pred obj func msg . args)
   (must-not1 pred obj func msg args))

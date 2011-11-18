@@ -43,7 +43,7 @@
 
 ;; http://lists.gnu.org/archive/html/guile-devel/2011-06/msg00044.html
 (define-syntax-rule (when test body ...)
-  (if test (begin body ... (if #f #f))))
+  (if test (begin body ...)))
 
 (define-syntax-rule (unless test body ...)
   (when (not test) body ...))
