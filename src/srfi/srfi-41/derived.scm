@@ -33,12 +33,12 @@
   #:use-module (ice-9 match)
   #:use-module (ice-9 q)
   #:export (define-stream list->stream port->stream stream stream->list
-            stream-append stream-concat stream-constant stream-do
-            stream-drop stream-drop-while stream-filter stream-fold
-            stream-for-each stream-from stream-iterate stream-length
-            stream-let stream-map stream-match stream-of stream-range
-            stream-ref stream-reverse stream-scan stream-split-at stream-take
-            stream-take-while stream-unfold stream-unfolds stream-zip))
+            stream-append stream-concat stream-constant stream-drop
+            stream-drop-while stream-filter stream-fold stream-for-each
+            stream-from stream-iterate stream-length stream-let stream-map
+            stream-match stream-of stream-range stream-ref stream-reverse
+            stream-scan stream-take stream-take-while stream-unfold
+            stream-unfolds stream-zip))
 
 (define-syntax-rule (define-stream (name . formal) body0 body1 ...)
   (define name (stream-lambda formal body0 body1 ...)))
@@ -283,15 +283,6 @@
     (if (stream-null? strm) (stream base)
         (stream-cons base (recur (proc base (stream-car strm))
                                  (stream-cdr strm))))))
-
-;; Similar to (values (stream->list n strm) (stream-drop n strm)) but
-;; only iterates through the stream once.
-(define (stream-split-at n strm)
-  (must stream? strm 'stream-split-at "non-stream argument")
-  (must integer? n 'stream-split-at "non-integer argument")
-  (must-not negative? n 'stream-split-at "negative argument")
-  (receive (head tail _) (stream-fold-aux xcons '() strm n)
-    (values (reverse! head) tail)))
 
 (define (stream-take n strm)
   (must stream? strm 'stream-take "non-stream argument")
