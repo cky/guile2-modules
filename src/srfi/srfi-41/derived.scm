@@ -250,11 +250,13 @@
     ((_ expr base pred? rest ...)
      (if pred? (stream-of-aux expr base rest ...) base))))
 
-(define* (stream-range first past #:optional (step (if (< first past) 1 -1)))
+(define* (stream-range first past #:optional step)
   (must number? first 'stream-range "non-numeric starting number")
   (must number? past 'stream-range "non-numeric ending number")
-  (must number? step 'stream-range "non-numeric step size")
-  (let ((lt? (if (< 0 step) < >)))
+  (when step
+    (must number? step 'stream-range "non-numeric step size"))
+  (let* ((step (or step (if (< first past) 1 -1)))
+         (lt? (if (< 0 step) < >)))
     (stream-let recur ((first first))
       (if (lt? first past)
           (stream-cons first (recur (+ first step)))
